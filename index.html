@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Game · 4×4</title>
+  <meta name="theme-color" content="#101322" />
+  <title>Trò chơi Trí nhớ</title>
   <style>
     :root {
       color-scheme: dark;
@@ -11,12 +12,14 @@
       --panel: #191e33;
       --card: #252c49;
       --card-hover: #303a5e;
-      --accent: #8b9cff;
-      --accent-2: #c4ccff;
+      --accent: #9ba9ff;
+      --accent-strong: #8293ff;
+      --accent-2: #e1e5ff;
       --text: #f4f6ff;
       --muted: #a8afcb;
       --matched: #244c4b;
       --matched-border: #55c8a4;
+      --danger: #ff9caa;
     }
 
     * { box-sizing: border-box; }
@@ -26,7 +29,7 @@
       min-height: 100vh;
       display: grid;
       place-items: center;
-      padding: 24px 16px;
+      padding: 20px 12px;
       background:
         radial-gradient(ellipse at top, rgba(92, 108, 190, .22), transparent 55%),
         var(--bg);
@@ -34,133 +37,305 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
+    button, input, select { font: inherit; }
+
     .game {
       width: min(100%, 440px);
-      padding: clamp(18px, 5vw, 30px);
-      border: 1px solid rgba(181, 191, 255, .13);
+      padding: clamp(17px, 4vw, 28px);
+      border: 1px solid rgba(181, 191, 255, .14);
       border-radius: 24px;
-      background: rgba(25, 30, 51, .94);
-      box-shadow: 0 24px 70px rgba(0, 0, 0, .28);
+      background: rgba(25, 30, 51, .96);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .3);
+      transition: width .2s ease;
     }
+    .game.wide-6 { width: min(100%, 540px); }
+    .game.wide-8 { width: min(100%, 640px); }
 
     header { text-align: center; margin-bottom: 22px; }
-    h1 { margin: 0; font-size: clamp(1.7rem, 7vw, 2.25rem); letter-spacing: -.04em; }
-    .subtitle { margin: 7px 0 0; color: var(--muted); font-size: .95rem; }
+    h1 { margin: 0; font-size: clamp(1.65rem, 6vw, 2.2rem); letter-spacing: -.04em; }
+    .subtitle { margin: 7px 0 0; color: var(--muted); font-size: .94rem; line-height: 1.5; }
+
+    .settings { display: grid; gap: 18px; }
+    .setting-block { display: grid; gap: 8px; }
+    .setting-title { display: block; font-weight: 750; font-size: .96rem; }
+    .setting-help { color: var(--muted); font-size: .82rem; line-height: 1.45; margin: 0; }
+
+    .select-wrap { position: relative; }
+    select, .number-input {
+      width: 100%;
+      min-height: 46px;
+      padding: 10px 12px;
+      border: 1px solid rgba(181, 191, 255, .22);
+      border-radius: 12px;
+      outline: none;
+      background: #222844;
+      color: var(--text);
+    }
+    select:focus-visible, .number-input:focus-visible, button:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .limit-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid rgba(181, 191, 255, .13);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .035);
+    }
+    .switch-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      cursor: pointer;
+      font-weight: 650;
+      font-size: .91rem;
+    }
+    .switch-label input {
+      appearance: none;
+      -webkit-appearance: none;
+      flex: 0 0 auto;
+      width: 42px;
+      height: 24px;
+      margin: 0;
+      position: relative;
+      border-radius: 999px;
+      background: #444b66;
+      cursor: pointer;
+      transition: background .2s ease;
+    }
+    .switch-label input::before {
+      content: "";
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      top: 3px;
+      left: 3px;
+      border-radius: 50%;
+      background: white;
+      transition: transform .2s ease;
+    }
+    .switch-label input:checked { background: var(--accent-strong); }
+    .switch-label input:checked::before { transform: translateX(18px); }
+    .switch-label input:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+    .number-input {
+      width: 88px;
+      min-width: 88px;
+      text-align: center;
+      font-weight: 750;
+      padding: 8px;
+      transition: opacity .2s ease, border-color .2s ease;
+    }
+    .number-input:disabled {
+      opacity: .36;
+      cursor: not-allowed;
+      background: #191e30;
+    }
+
+    .extra-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid rgba(181, 191, 255, .13);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .035);
+    }
+    .check-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: .91rem; font-weight: 650; }
+    .check-label input { width: 18px; height: 18px; accent-color: var(--accent-strong); }
+
+    .primary-button, .secondary-button {
+      width: 100%;
+      min-height: 48px;
+      padding: 12px 18px;
+      border: 0;
+      border-radius: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: filter .15s ease, transform .15s ease, background .15s ease;
+    }
+    .primary-button { background: var(--accent); color: #11152b; }
+    .secondary-button { background: #2a3150; color: var(--text); border: 1px solid rgba(181, 191, 255, .16); }
+    .primary-button:hover, .secondary-button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+    .button-stack { display: grid; gap: 10px; margin-top: 16px; }
+    [hidden] { display: none !important; }
 
     .stats {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      margin: 0 0 18px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 9px;
+      margin: 0 0 17px;
     }
-
-    .stat {
-      flex: 1;
-      padding: 10px 12px;
-      border-radius: 14px;
-      background: rgba(255, 255, 255, .045);
-      text-align: center;
-    }
-
-    .stat-label { display: block; color: var(--muted); font-size: .75rem; }
-    .stat-value { display: block; margin-top: 2px; font-size: 1.2rem; font-weight: 750; }
+    .stat { min-width: 0; padding: 10px 6px; border-radius: 13px; background: rgba(255, 255, 255, .045); text-align: center; }
+    .stat-label { display: block; color: var(--muted); font-size: .73rem; }
+    .stat-value { display: block; margin-top: 3px; font-size: 1.12rem; font-weight: 800; overflow-wrap: anywhere; }
+    .rule-note { text-align: center; margin: -4px 0 14px; color: var(--muted); font-size: .8rem; }
 
     .grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: clamp(8px, 2.5vw, 12px);
+      gap: clamp(6px, 1.8vw, 10px);
     }
-
     .card {
       aspect-ratio: 1;
+      min-width: 0;
       display: grid;
       place-items: center;
+      padding: 0;
       border: 1px solid rgba(181, 191, 255, .14);
-      border-radius: 15px;
+      border-radius: 12px;
       background: var(--card);
       color: var(--accent-2);
-      font: inherit;
-      font-size: clamp(1.35rem, 6vw, 2rem);
-      font-weight: 800;
+      font-size: clamp(1.2rem, 5vw, 2rem);
+      font-weight: 850;
       cursor: pointer;
       user-select: none;
       transition: transform .15s ease, background .15s ease, border-color .15s ease;
       -webkit-tap-highlight-color: transparent;
     }
-
     .card:not(:disabled):hover { background: var(--card-hover); transform: translateY(-2px); }
-    .card:focus-visible, .play-again:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
     .card.flipped { background: #353d66; border-color: var(--accent); color: #fff; }
     .card.matched { background: var(--matched); border-color: var(--matched-border); color: #a9f3d9; cursor: default; }
     .card:disabled { cursor: default; }
+    .grid.size-6 .card { border-radius: 10px; font-size: clamp(.95rem, 3.8vw, 1.55rem); }
+    .grid.size-8 .card { border-radius: 8px; font-size: clamp(.72rem, 2.8vw, 1.15rem); }
 
     .message {
       min-height: 26px;
-      margin: 17px 0 0;
+      margin: 16px 0 0;
       color: var(--muted);
       text-align: center;
-      font-size: .92rem;
+      font-size: .9rem;
+      line-height: 1.45;
     }
+    .message.success { color: #8be1c3; font-weight: 750; }
+    .message.failure { color: var(--danger); font-weight: 750; }
 
-    .play-again {
-      display: block;
-      width: 100%;
-      margin-top: 12px;
-      padding: 13px 18px;
-      border: 0;
-      border-radius: 13px;
-      background: var(--accent);
-      color: #11152b;
-      font: inherit;
-      font-weight: 800;
-      cursor: pointer;
-      transition: filter .15s ease, transform .15s ease;
+    @media (max-width: 360px) {
+      body { padding: 10px 7px; }
+      .game { padding: 15px 12px; border-radius: 18px; }
+      .limit-row, .extra-row { padding: 10px 8px; }
+      .switch-label, .check-label { font-size: .83rem; }
+      .number-input { width: 72px; min-width: 72px; }
+      .grid { gap: 5px; }
     }
-
-    .play-again:hover { filter: brightness(1.08); transform: translateY(-1px); }
-    .play-again[hidden] { display: none; }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { transition: none !important; }
-    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
   </style>
 </head>
 <body>
-  <main class="game" aria-labelledby="title">
-    <header>
-      <h1 id="title">Memory Game</h1>
-      <p class="subtitle">Find all 8 matching number pairs</p>
-    </header>
+  <main class="game" id="gamePanel">
+    <section id="settingsView" aria-labelledby="settingsTitle">
+      <header>
+        <h1 id="settingsTitle">Trò chơi Trí nhớ</h1>
+        <p class="subtitle">Lật thẻ, tìm các cặp số giống nhau!</p>
+      </header>
 
-    <section class="stats" aria-label="Game statistics">
-      <div class="stat">
-        <span class="stat-label">Moves</span>
-        <span class="stat-value" id="moves">0</span>
+      <div class="settings">
+        <div class="setting-block">
+          <label class="setting-title" for="boardSize">Kích thước bảng</label>
+          <div class="select-wrap">
+            <select id="boardSize">
+              <option value="4">4 × 4 — Dễ (8 cặp)</option>
+              <option value="6">6 × 6 — Vừa (18 cặp)</option>
+              <option value="8">8 × 8 — Khó (32 cặp)</option>
+            </select>
+          </div>
+          <p class="setting-help">Mỗi cặp gồm hai thẻ có cùng một số.</p>
+        </div>
+
+        <div class="setting-block">
+          <div class="limit-row">
+            <label class="switch-label" for="limitToggle">
+              <input id="limitToggle" type="checkbox" />
+              <span>Giới hạn lượt đoán</span>
+            </label>
+            <input class="number-input" id="maxGuesses" type="number" min="1" max="9999" step="1" value="20" disabled aria-label="Số lượt đoán tối đa" />
+          </div>
+          <p class="setting-help">Một lượt đoán được tính sau khi bạn lật đủ hai thẻ.</p>
+        </div>
+
+        <div class="extra-row">
+          <label class="check-label" for="timerToggle">
+            <input id="timerToggle" type="checkbox" checked />
+            <span>Hiển thị thời gian</span>
+          </label>
+          <span class="setting-help">Tùy chọn</span>
+        </div>
       </div>
-      <div class="stat">
-        <span class="stat-label">Pairs</span>
-        <span class="stat-value" id="pairs">0 / 8</span>
+
+      <div class="button-stack">
+        <button class="primary-button" id="playButton" type="button">Bắt đầu chơi</button>
       </div>
     </section>
 
-    <section class="grid" id="grid" aria-label="Memory cards"></section>
-    <p class="message" id="message" role="status" aria-live="polite">Tap any card to begin.</p>
-    <button class="play-again" id="playAgain" type="button" hidden>Play Again</button>
+    <section id="gameView" hidden aria-labelledby="gameTitle">
+      <header>
+        <h1 id="gameTitle">Trí nhớ số</h1>
+        <p class="subtitle" id="gameSubtitle">Tìm tất cả các cặp số giống nhau.</p>
+      </header>
+
+      <section class="stats" aria-label="Thống kê trò chơi">
+        <div class="stat">
+          <span class="stat-label">Lượt đoán</span>
+          <span class="stat-value" id="moves">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Số cặp</span>
+          <span class="stat-value" id="pairs">0 / 8</span>
+        </div>
+        <div class="stat" id="timerStat">
+          <span class="stat-label">Thời gian</span>
+          <span class="stat-value" id="timer">00:00</span>
+        </div>
+      </section>
+
+      <p class="rule-note" id="ruleNote" hidden></p>
+      <section class="grid" id="grid" aria-label="Các thẻ số"></section>
+      <p class="message" id="message" role="status" aria-live="polite">Hãy chọn hai thẻ để tìm một cặp.</p>
+      <div class="button-stack" id="resultButtons" hidden>
+        <button class="primary-button" id="playAgainButton" type="button">Chơi lại</button>
+        <button class="secondary-button" id="settingsButton" type="button">Cài đặt</button>
+      </div>
+    </section>
   </main>
 
   <script>
+    const gamePanel = document.getElementById('gamePanel');
+    const settingsView = document.getElementById('settingsView');
+    const gameView = document.getElementById('gameView');
+    const boardSizeInput = document.getElementById('boardSize');
+    const limitToggle = document.getElementById('limitToggle');
+    const maxGuessesInput = document.getElementById('maxGuesses');
+    const timerToggle = document.getElementById('timerToggle');
+    const playButton = document.getElementById('playButton');
     const grid = document.getElementById('grid');
     const movesDisplay = document.getElementById('moves');
     const pairsDisplay = document.getElementById('pairs');
+    const timerDisplay = document.getElementById('timer');
+    const timerStat = document.getElementById('timerStat');
+    const ruleNote = document.getElementById('ruleNote');
     const message = document.getElementById('message');
-    const playAgainButton = document.getElementById('playAgain');
+    const resultButtons = document.getElementById('resultButtons');
+    const playAgainButton = document.getElementById('playAgainButton');
+    const settingsButton = document.getElementById('settingsButton');
 
+    let settings = { size: 4, limitEnabled: false, maxGuesses: 20, showTimer: true };
     let firstCard = null;
     let secondCard = null;
     let lockBoard = false;
+    let gameEnded = false;
     let moves = 0;
     let matchedPairs = 0;
+    let totalPairs = 8;
     let mismatchTimeout = null;
+    let timerInterval = null;
+    let elapsedSeconds = 0;
 
     function shuffle(values) {
       for (let i = values.length - 1; i > 0; i--) {
@@ -170,48 +345,141 @@
       return values;
     }
 
-    function startGame() {
+    function formatTime(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      if (hours > 0) {
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
+      return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function updateTimer() {
+      timerDisplay.textContent = formatTime(elapsedSeconds);
+    }
+
+    function stopTimer() {
+      if (timerInterval !== null) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
+
+    function startTimer() {
+      stopTimer();
+      if (!settings.showTimer) return;
+      timerInterval = setInterval(() => {
+        if (!gameEnded) {
+          elapsedSeconds++;
+          updateTimer();
+        }
+      }, 1000);
+    }
+
+    function syncLimitInput() {
+      maxGuessesInput.disabled = !limitToggle.checked;
+    }
+
+    function applyPanelWidth(size) {
+      gamePanel.classList.remove('wide-6', 'wide-8');
+      if (size === 6) gamePanel.classList.add('wide-6');
+      if (size === 8) gamePanel.classList.add('wide-8');
+    }
+
+    function returnToSettings() {
+      clearPendingTurn();
+      stopTimer();
+      gameView.hidden = true;
+      settingsView.hidden = false;
+      resultButtons.hidden = true;
+      applyPanelWidth(Number(boardSizeInput.value));
+    }
+
+    function clearPendingTurn() {
       if (mismatchTimeout !== null) {
         clearTimeout(mismatchTimeout);
         mismatchTimeout = null;
       }
+    }
+
+    function readSettings() {
+      const size = Number(boardSizeInput.value);
+      const limitEnabled = limitToggle.checked;
+      const maxGuesses = Number(maxGuessesInput.value);
+      if (limitEnabled && (!Number.isInteger(maxGuesses) || maxGuesses < 1 || maxGuesses > 9999)) {
+        maxGuessesInput.setCustomValidity('Vui lòng nhập số lượt đoán từ 1 đến 9999.');
+        maxGuessesInput.reportValidity();
+        return false;
+      }
+      maxGuessesInput.setCustomValidity('');
+      settings = { size, limitEnabled, maxGuesses, showTimer: timerToggle.checked };
+      return true;
+    }
+
+    function startGame() {
+      clearPendingTurn();
+      if (!readSettings()) return;
+
+      settingsView.hidden = true;
+      gameView.hidden = false;
+      applyPanelWidth(settings.size);
 
       firstCard = null;
       secondCard = null;
       lockBoard = false;
+      gameEnded = false;
       moves = 0;
       matchedPairs = 0;
+      totalPairs = (settings.size * settings.size) / 2;
+      elapsedSeconds = 0;
+
       movesDisplay.textContent = '0';
-      pairsDisplay.textContent = '0 / 8';
-      message.textContent = 'Tap any card to begin.';
-      playAgainButton.hidden = true;
+      pairsDisplay.textContent = `0 / ${totalPairs}`;
+      timerDisplay.textContent = '00:00';
+      timerStat.hidden = !settings.showTimer;
+      resultButtons.hidden = true;
+      message.className = 'message';
+      message.textContent = 'Hãy chọn hai thẻ để tìm một cặp.';
+
+      if (settings.limitEnabled) {
+        ruleNote.textContent = `Bạn có tối đa ${settings.maxGuesses} lượt đoán.`;
+        ruleNote.hidden = false;
+      } else {
+        ruleNote.hidden = true;
+      }
+
+      grid.className = `grid size-${settings.size}`;
+      grid.style.gridTemplateColumns = `repeat(${settings.size}, minmax(0, 1fr))`;
       grid.replaceChildren();
 
-      const numbers = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8]);
-      numbers.forEach((number, index) => {
+      const numbers = [];
+      for (let value = 1; value <= totalPairs; value++) numbers.push(value, value);
+      shuffle(numbers).forEach((number, index) => {
+        const position = index + 1;
         const card = document.createElement('button');
         card.type = 'button';
         card.className = 'card';
         card.textContent = '?';
         card.dataset.number = String(number);
-        card.setAttribute('aria-label', `Card ${index + 1}, face down`);
-        card.addEventListener('click', () => flipCard(card, index + 1));
+        card.setAttribute('aria-label', `Thẻ ${position}, đang úp`);
+        card.addEventListener('click', () => flipCard(card, position));
         grid.appendChild(card);
       });
+
+      startTimer();
     }
 
     function flipCard(card, position) {
-      if (lockBoard || card === firstCard || card.classList.contains('matched') || card.classList.contains('flipped')) {
-        return;
-      }
+      if (gameEnded || lockBoard || card === firstCard || card.classList.contains('matched') || card.classList.contains('flipped')) return;
 
       card.classList.add('flipped');
       card.textContent = card.dataset.number;
-      card.setAttribute('aria-label', `Card ${position}, number ${card.dataset.number}`);
+      card.setAttribute('aria-label', `Thẻ ${position}, số ${card.dataset.number}`);
 
       if (!firstCard) {
         firstCard = card;
-        message.textContent = 'Pick one more card.';
+        message.textContent = 'Chọn thêm một thẻ nữa.';
         return;
       }
 
@@ -227,43 +495,69 @@
         secondCard.classList.add('matched');
         firstCard.disabled = true;
         secondCard.disabled = true;
-        firstCard.setAttribute('aria-label', `Matched number ${firstCard.dataset.number}`);
-        secondCard.setAttribute('aria-label', `Matched number ${secondCard.dataset.number}`);
+        firstCard.setAttribute('aria-label', `Đã ghép cặp số ${firstCard.dataset.number}`);
+        secondCard.setAttribute('aria-label', `Đã ghép cặp số ${secondCard.dataset.number}`);
         matchedPairs++;
-        pairsDisplay.textContent = `${matchedPairs} / 8`;
+        pairsDisplay.textContent = `${matchedPairs} / ${totalPairs}`;
         resetTurn();
 
-        if (matchedPairs === 8) {
-          message.textContent = `You won in ${moves} moves! 🎉`;
-          playAgainButton.hidden = false;
+        if (matchedPairs === totalPairs) {
+          endGame(true);
+        } else if (settings.limitEnabled && moves >= settings.maxGuesses) {
+          endGame(false);
         } else {
-          message.textContent = 'Match found! Keep going.';
+          message.textContent = 'Chính xác! Tiếp tục tìm các cặp còn lại.';
         }
       } else {
-        message.textContent = 'Not a match — try again.';
+        message.textContent = 'Chưa khớp. Hãy ghi nhớ vị trí các số!';
         mismatchTimeout = setTimeout(() => {
           [firstCard, secondCard].forEach((flippedCard) => {
+            if (!flippedCard) return;
             flippedCard.classList.remove('flipped');
             flippedCard.textContent = '?';
             const cardIndex = Array.from(grid.children).indexOf(flippedCard) + 1;
-            flippedCard.setAttribute('aria-label', `Card ${cardIndex}, face down`);
+            flippedCard.setAttribute('aria-label', `Thẻ ${cardIndex}, đang úp`);
           });
           mismatchTimeout = null;
           resetTurn();
-          message.textContent = 'Try another pair.';
-        }, 800);
+          if (settings.limitEnabled && moves >= settings.maxGuesses) {
+            endGame(false);
+          } else {
+            message.textContent = 'Hãy thử một cặp khác.';
+          }
+        }, 750);
       }
     }
 
     function resetTurn() {
-      [firstCard, secondCard] = [null, null];
+      firstCard = null;
+      secondCard = null;
       lockBoard = false;
     }
 
-    playAgainButton.addEventListener('click', startGame);
+    function endGame(won) {
+      gameEnded = true;
+      lockBoard = true;
+      stopTimer();
+      resultButtons.hidden = false;
+      message.className = won ? 'message success' : 'message failure';
+      if (won) {
+        const timeText = settings.showTimer ? ` trong ${formatTime(elapsedSeconds)}` : '';
+        message.textContent = `Bạn đã chiến thắng${timeText}, sau ${moves} lượt đoán! 🎉`;
+      } else {
+        message.textContent = `Bạn đã hết lượt đoán! Tìm được ${matchedPairs}/${totalPairs} cặp. Hãy thử lại nhé!`;
+      }
+    }
 
-    // Start immediately when the page opens.
-    startGame();
+    limitToggle.addEventListener('change', syncLimitInput);
+    maxGuessesInput.addEventListener('input', () => maxGuessesInput.setCustomValidity(''));
+    boardSizeInput.addEventListener('change', () => applyPanelWidth(Number(boardSizeInput.value)));
+    playButton.addEventListener('click', startGame);
+    playAgainButton.addEventListener('click', startGame);
+    settingsButton.addEventListener('click', returnToSettings);
+
+    syncLimitInput();
+    applyPanelWidth(Number(boardSizeInput.value));
   </script>
 </body>
 </html>
