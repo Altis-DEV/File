@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memory Game · 4×4</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101322;
+      --panel: #191e33;
+      --card: #252c49;
+      --card-hover: #303a5e;
+      --accent: #8b9cff;
+      --accent-2: #c4ccff;
+      --text: #f4f6ff;
+      --muted: #a8afcb;
+      --matched: #244c4b;
+      --matched-border: #55c8a4;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px 16px;
+      background:
+        radial-gradient(ellipse at top, rgba(92, 108, 190, .22), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .game {
+      width: min(100%, 440px);
+      padding: clamp(18px, 5vw, 30px);
+      border: 1px solid rgba(181, 191, 255, .13);
+      border-radius: 24px;
+      background: rgba(25, 30, 51, .94);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .28);
+    }
+
+    header { text-align: center; margin-bottom: 22px; }
+    h1 { margin: 0; font-size: clamp(1.7rem, 7vw, 2.25rem); letter-spacing: -.04em; }
+    .subtitle { margin: 7px 0 0; color: var(--muted); font-size: .95rem; }
+
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin: 0 0 18px;
+    }
+
+    .stat {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .045);
+      text-align: center;
+    }
+
+    .stat-label { display: block; color: var(--muted); font-size: .75rem; }
+    .stat-value { display: block; margin-top: 2px; font-size: 1.2rem; font-weight: 750; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: clamp(8px, 2.5vw, 12px);
+    }
+
+    .card {
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(181, 191, 255, .14);
+      border-radius: 15px;
+      background: var(--card);
+      color: var(--accent-2);
+      font: inherit;
+      font-size: clamp(1.35rem, 6vw, 2rem);
+      font-weight: 800;
+      cursor: pointer;
+      user-select: none;
+      transition: transform .15s ease, background .15s ease, border-color .15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .card:not(:disabled):hover { background: var(--card-hover); transform: translateY(-2px); }
+    .card:focus-visible, .play-again:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    .card.flipped { background: #353d66; border-color: var(--accent); color: #fff; }
+    .card.matched { background: var(--matched); border-color: var(--matched-border); color: #a9f3d9; cursor: default; }
+    .card:disabled { cursor: default; }
+
+    .message {
+      min-height: 26px;
+      margin: 17px 0 0;
+      color: var(--muted);
+      text-align: center;
+      font-size: .92rem;
+    }
+
+    .play-again {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 13px 18px;
+      border: 0;
+      border-radius: 13px;
+      background: var(--accent);
+      color: #11152b;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      transition: filter .15s ease, transform .15s ease;
+    }
+
+    .play-again:hover { filter: brightness(1.08); transform: translateY(-1px); }
+    .play-again[hidden] { display: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="game" aria-labelledby="title">
+    <header>
+      <h1 id="title">Memory Game</h1>
+      <p class="subtitle">Find all 8 matching number pairs</p>
+    </header>
+
+    <section class="stats" aria-label="Game statistics">
+      <div class="stat">
+        <span class="stat-label">Moves</span>
+        <span class="stat-value" id="moves">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Pairs</span>
+        <span class="stat-value" id="pairs">0 / 8</span>
+      </div>
+    </section>
+
+    <section class="grid" id="grid" aria-label="Memory cards"></section>
+    <p class="message" id="message" role="status" aria-live="polite">Tap any card to begin.</p>
+    <button class="play-again" id="playAgain" type="button" hidden>Play Again</button>
+  </main>
+
+  <script>
+    const grid = document.getElementById('grid');
+    const movesDisplay = document.getElementById('moves');
+    const pairsDisplay = document.getElementById('pairs');
+    const message = document.getElementById('message');
+    const playAgainButton = document.getElementById('playAgain');
+
+    let firstCard = null;
+    let secondCard = null;
+    let lockBoard = false;
+    let moves = 0;
+    let matchedPairs = 0;
+    let mismatchTimeout = null;
+
+    function shuffle(values) {
+      for (let i = values.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [values[i], values[j]] = [values[j], values[i]];
+      }
+      return values;
+    }
+
+    function startGame() {
+      if (mismatchTimeout !== null) {
+        clearTimeout(mismatchTimeout);
+        mismatchTimeout = null;
+      }
+
+      firstCard = null;
+      secondCard = null;
+      lockBoard = false;
+      moves = 0;
+      matchedPairs = 0;
+      movesDisplay.textContent = '0';
+      pairsDisplay.textContent = '0 / 8';
+      message.textContent = 'Tap any card to begin.';
+      playAgainButton.hidden = true;
+      grid.replaceChildren();
+
+      const numbers = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8]);
+      numbers.forEach((number, index) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'card';
+        card.textContent = '?';
+        card.dataset.number = String(number);
+        card.setAttribute('aria-label', `Card ${index + 1}, face down`);
+        card.addEventListener('click', () => flipCard(card, index + 1));
+        grid.appendChild(card);
+      });
+    }
+
+    function flipCard(card, position) {
+      if (lockBoard || card === firstCard || card.classList.contains('matched') || card.classList.contains('flipped')) {
+        return;
+      }
+
+      card.classList.add('flipped');
+      card.textContent = card.dataset.number;
+      card.setAttribute('aria-label', `Card ${position}, number ${card.dataset.number}`);
+
+      if (!firstCard) {
+        firstCard = card;
+        message.textContent = 'Pick one more card.';
+        return;
+      }
+
+      secondCard = card;
+      lockBoard = true;
+      moves++;
+      movesDisplay.textContent = String(moves);
+
+      if (firstCard.dataset.number === secondCard.dataset.number) {
+        firstCard.classList.remove('flipped');
+        secondCard.classList.remove('flipped');
+        firstCard.classList.add('matched');
+        secondCard.classList.add('matched');
+        firstCard.disabled = true;
+        secondCard.disabled = true;
+        firstCard.setAttribute('aria-label', `Matched number ${firstCard.dataset.number}`);
+        secondCard.setAttribute('aria-label', `Matched number ${secondCard.dataset.number}`);
+        matchedPairs++;
+        pairsDisplay.textContent = `${matchedPairs} / 8`;
+        resetTurn();
+
+        if (matchedPairs === 8) {
+          message.textContent = `You won in ${moves} moves! 🎉`;
+          playAgainButton.hidden = false;
+        } else {
+          message.textContent = 'Match found! Keep going.';
+        }
+      } else {
+        message.textContent = 'Not a match — try again.';
+        mismatchTimeout = setTimeout(() => {
+          [firstCard, secondCard].forEach((flippedCard) => {
+            flippedCard.classList.remove('flipped');
+            flippedCard.textContent = '?';
+            const cardIndex = Array.from(grid.children).indexOf(flippedCard) + 1;
+            flippedCard.setAttribute('aria-label', `Card ${cardIndex}, face down`);
+          });
+          mismatchTimeout = null;
+          resetTurn();
+          message.textContent = 'Try another pair.';
+        }, 800);
+      }
+    }
+
+    function resetTurn() {
+      [firstCard, secondCard] = [null, null];
+      lockBoard = false;
+    }
+
+    playAgainButton.addEventListener('click', startGame);
+
+    // Start immediately when the page opens.
+    startGame();
+  </script>
+</body>
+</html>
